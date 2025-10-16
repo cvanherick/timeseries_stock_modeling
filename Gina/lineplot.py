@@ -1,6 +1,7 @@
 import yfinance as yf
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 # Choose a stock ticker — for example, Apple
 ticker = yf.Ticker("MSFT")
@@ -9,7 +10,7 @@ ticker = yf.Ticker("MSFT")
 data = ticker.history(period="6mo")
 
 # Show the first few rows
-print(data.head())
+# print(data.head())
 
 print(data.shape)
 
@@ -19,4 +20,18 @@ plt.title("Microsoft Stock Price (Last 6 Months)")
 plt.xlabel("Date")
 plt.ylabel("Closing Price (USD)")
 plt.xticks(data.index[::11], rotation=45)
-plt.show()
+# plt.show()
+
+# Writes the data column in datetime form
+data = data.reset_index()
+data["Date"] = pd.to_datetime(data["Date"])
+
+# fills in missing values with the average of the day before and after
+data = data.ffill()
+
+# tells the data to only look at business days - sets frequency of the data to business days
+data = data.asfreq('B')
+
+# lag feature looks at data in the context of other times - some predictor variable for tomorrow without knowing what the actual valeus are going to be
+data["Close shifted by 5"] = data["Close"].shift(3)
+print(data.head())
