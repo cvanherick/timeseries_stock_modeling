@@ -22,10 +22,6 @@ plt.ylabel("Closing Price (USD)")
 plt.xticks(data.index[::11], rotation=45)
 # plt.show()
 
-# Writes the data column in datetime form
-data = data.reset_index()
-data["Date"] = pd.to_datetime(data["Date"])
-
 # fills in missing values with the average of the day before and after
 data = data.ffill()
 
@@ -33,5 +29,5 @@ data = data.ffill()
 data = data.asfreq('B')
 
 # lag feature looks at data in the context of other times - some predictor variable for tomorrow without knowing what the actual valeus are going to be
-data["Close shifted by 5"] = data["Close"].shift(3)
+data["Close shifted by 5"] = data["Close"].shift(5)
 print(data.head())
