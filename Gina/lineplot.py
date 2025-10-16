@@ -29,5 +29,11 @@ data = data.ffill()
 data = data.asfreq('B')
 
 # lag feature looks at data in the context of other times - some predictor variable for tomorrow without knowing what the actual valeus are going to be
-data["Close shifted by 5"] = data["Close"].shift(5)
+data["Close shift by 1"] = data["Close"].shift(1)
+data["Close shift by 3"] = data["Close"].shift(3)
+data["Close shift by 5"] = data["Close"].shift(5)
+data["Close shift by 10"] = data["Close"].shift(10)
+data["Close shift by 15"] = data["Close"].shift(15)
+data["Close shift by 20"] = data["Close"].shift(20)
+
 print(data.head())
