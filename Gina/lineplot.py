@@ -23,21 +23,46 @@ plt.xticks(data.index[::11], rotation=45)
 # plt.show()
 
 # fills in missing values with the average of the day before and after
-data = data.ffill()
+# .ffill()
 
 # tells the data to only look at business days - sets frequency of the data to business days
-data = data.asfreq('B')
+# .asfreq('B)
 
 # lag feature looks at data in the context of other times - some predictor variable for tomorrow without knowing what the actual valeus are going to be
-data["High sft by 1"] = data["High"].shift(1)
-data["High sft by 3"] = data["High"].shift(3)
-data["High sft by 5"] = data["High"].shift(5)
-data["High sft by 10"] = data["High"].shift(10)
-data["High sft by 15"] = data["High"].shift(15)
-data["High sft by 20"] = data["High"].shift(20)
+# .shift
+
 
 
 #rolling average / rolling sd = average over the past x amount of days
 data["rolling average by 20 (high)"] = data["High"].rolling(20).mean()
 
-print(data.head())
+print(data.head(20))
+
+def feature_engineering(df):
+    df["Date"] = pd.to_datetime[df["Date"]]
+    df = df.set_index["Date"].sort_index()
+    # tells the data to only look at business days - sets frequency of the data to business days
+    df = df.asfreq('B')
+    # fills in missing values with the average of the day before and after
+    df = df.ffill()
+    # lag feature looks at data in the context of other times - some predictor variable for tomorrow without knowing what the actual values are going to be
+    for lag in [1, 3, 5, 10]:
+        df["high_lag_{lag}]"] = df["High"].shift(lag)
+    df["rolling_mean_5"] = df["High"].rolling(5).mean()
+    df["rolling_std_5"] = df["High"].rolling(5).std()
+
+    df["day_of_week"] = df.index.dayofweek
+    df["month"] = df.index.month
+    df = df.dropna()
+
+cleaned_data = feature_engineering(data)
+train_data = cleaned_data.iloc[:-5]
+test_data = cleaned_data.iloc[-5:]
+
+y_train = train_data['Close']
+x_train = train_data.drop(columns=["Close"])
+
+y_test = test_data["Close"]
+x_test = test_data.drop(columns=["Close"])
+
+    
