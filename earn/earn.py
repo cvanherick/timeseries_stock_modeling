@@ -41,6 +41,11 @@ data["Close shifted 25d"] = data["Close"].shift(25)
 
 
 
+'rolling is the past 20 days average'
+'can do mean or std deviation'
+data["Rolling Mean 20d"] = data["Close"].rolling(window=20).mean()
+data["Rolling Std 20d"] = data["Close"].rolling(window=20).std()
+
 
 
 
