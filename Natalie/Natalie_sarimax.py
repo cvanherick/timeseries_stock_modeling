@@ -13,11 +13,12 @@ ticker = yf.Ticker("GOOG") #TO DO
 #TO DO EXPERIMENT WITH DIFFERNT TIME PERIOD AFTER TRAINING YOUR MODEL
 raw_data = ticker.history(period="6mo") #TO DO
 
-
 # 2. Feature Engineering Pipelines
 def feature_engineering_train(df):
     """Feature engineering for training data."""
-    df["Date"] = pd.to_datetime(df["Date"])  #TO DO SET THE DAT COLUMN TO A DATETIME OBJECT
+    df = df.copy()
+    df["Date"] = df.index
+    df["Date"] = pd.to_datetime(df["Date"]) #TO DO SET THE DATE COLUMN TO A DATETIME OBJECT
     df = df.set_index("Date").sort_index()  #TO DO SET THE DATE AS THE INDEX
     df = df.asfreq('B') #TO DO SET TO BUSINESS DAY FREQUENCY
     df = df.ffill()
@@ -130,7 +131,8 @@ results_full = model_full.fit(disp=False)
 
 # Generate future features
 future_days = 5
-X_future_scaled = feature_engineering_future(full_X_scaled, scaler, future_days=future_days)
+X_future_scaled = feature_engineering_future(full_X_scaled, future_days=future_days) # Deleted scaler argument
+
 
 forecast_future = results_full.get_forecast(steps=future_days, exog=X_future_scaled)
 forecast_future_mean = forecast_future.predicted_mean
