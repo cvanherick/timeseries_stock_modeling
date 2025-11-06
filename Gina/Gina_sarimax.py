@@ -9,18 +9,21 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 # 1. Download Stock Data
 
-ticker = yf.Ticker("your stock here") #TO DO
+ticker = yf.Ticker("MSFT") 
+#TO DO
 #TO DO EXPERIMENT IWTH DIFFERNT TIME PERIOD AFTER TRAINING YOUR MODEL
-raw_data = ticker.history(period="experiment with differnt time periods") #TO DO
+raw_data = ticker.history(period="6mo") #TO DO
 
 
 # 2. Feature Engineering Pipelines
 def feature_engineering_train(df):
     """Feature engineering for training data."""
     #TO DO SET THE DAT COLUMN TO A DATETIME OBJECT
-    df["Date"] = pd.to_datetime[df["Date"]]
+    df = df.copy()
+    df["Date"] = df.index
+    df["Date"] = pd.to_datetime(df["Date"])
     #TO DO SET THE DATE AS THE INDEX
-    df = df.set_index["Date"].sort_index()
+    df = df.set_index("Date").sort_index()
     #TO DO SET TO BUSINESS DAY FREQUENCY
     df = df.asfreq('B')
 
@@ -34,7 +37,7 @@ def feature_engineering_train(df):
     #TO DO below this it what i did for mine you can try differnt things for your data depending on what rends you see in your data
     df['rolling_mean_5'] = df['High'].rolling(5).mean() #5 days = 1 week
     df['rolling_std_5'] = df['High'].rolling(5).std() #5 days = 1 week
-    df['rolling_mean_20'] = df['High'].rolling(20).mean() #5 days = ~1 month
+
     
     df['returns'] = df['Open'].pct_change()
     df['volatility_10'] = df['returns'].rolling(10).std()
@@ -100,6 +103,11 @@ model = SARIMAX(
     enforce_stationarity=False,
     enforce_invertibility=False
     )
+model = SARIMAX(
+    endog=y_train, 
+    exog=X_train_scaled, 
+    order=order, 
+    seasonal_order=seasonal_order)
 results = model.fit(disp=False)
 print(results.summary())
 
@@ -128,7 +136,7 @@ results_full = model_full.fit(disp=False)
 
 # Generate future features
 future_days = 5
-X_future_scaled = feature_engineering_future(full_X_scaled, scaler, future_days=future_days)
+X_future_scaled = feature_engineering_future(full_X_scaled,future_days=future_days)
 
 forecast_future = results_full.get_forecast(steps=future_days, exog=X_future_scaled)
 forecast_future_mean = forecast_future.predicted_mean
