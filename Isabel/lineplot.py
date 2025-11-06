@@ -8,7 +8,7 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 
 # Choose a stock ticker — for example, Apple
-ticker = yf.Ticker("META")
+ticker = yf.Ticker("NFLX")
 
 # Download recent data (e.g. 6 months)
 meta = ticker.history(period="6mo")
@@ -17,7 +17,7 @@ meta = ticker.history(period="6mo")
 print(meta.head())
 
 plt.figure(figsize = (10,5))
-plt.plot(meta.index, meta['Close'], label = 'META')
+plt.plot(meta.index, meta['Close'], label = 'NFLX')
 plt.title('Meta Stock Price (Last 6 Months)')
 plt.xlabel('Date')
 plt.ylabel('Closing Price (USD)')
@@ -59,9 +59,29 @@ def feature_engineering(df):
     df = df.dropna()
     return df
 
+def feature_engineering_future(last_df, future_days = 5):
+    """
+    Generate exogenous features for future days beyond the available dataset.
+    Reuses scaled features and updates calendar-based fields. 
+    This function bassicailly pulls the data from the last day to use as the matrix when forecasting future values.
+    """
+    future_dates = pd.bdate_range(start=last_df.index[-1] + pd.Timedelta(days=1), periods=future_days) #timedelta allows arithmetic with datetime objects
+
+    
+    repeated_vals = np.tile(last_df.iloc[-1].values, (future_days, 1))
+    future_exog = pd.DataFrame(repeated_vals, index=future_dates, columns=last_df.columns)
+
+    if 'day_of_week' in future_exog.columns:
+        future_exog['day_of_week'] = future_exog.index.dayofweek
+    if 'month' in future_exog.columns:
+        future_exog['month'] = future_exog.index.month
+
+    return future_exog
+
 meta = feature_engineering(meta)
-train_data = meta.iloc[:-5]
-test_data = meta.iloc[-5:]
+test_days = 5
+train_data = meta.iloc[:-test_days]
+test_data = meta.iloc[-test_days:]
 
 y_train = train_data['Close']
 X_train = train_data.drop(columns = ['Close'])
@@ -90,89 +110,85 @@ X_test_scaled = pd.DataFrame(
 )
 
 
-# Create the SARIMAX Model
-order = (1, 1, 1) # Simple AR, differencing, and MA
-seasonal_order = (1, 1, 1, 5) # Weekly seasonality (5 business days)
+# 4. Fit SARIMAX Model (Training)
+order = (1, 1, 1)
+seasonal_order = (1, 1, 1, 5)
 
 model = SARIMAX(
-    endog = y_train,              
-    exog = X_train_scaled, 
-    order = order,
-    seasonal_order = seasonal_order,
-    enforce_stationarity = False, 
-    enforce_invertibility = False
+    endog=y_train,
+    exog=X_train_scaled,
+    order=order,
+    seasonal_order=seasonal_order,
+    enforce_stationarity=False,
+    enforce_invertibility=False
 )
+results = model.fit()
 
-results = model.fit(disp = False)
+model = SARIMAX(endog=y_train, exog=X_train_scaled, order=order, seasonal_order=seasonal_order)
+results = model.fit(disp=False)
 print(results.summary())
 
-# Evalulating Test Set
-forecast_test = results.get_forecast(steps = 5, exog=X_test_scaled)
-predictions = forecast_test.predicted_mean
-conf_int = forecast_test.conf_int()
 
-rmse = np.sqrt(mean_squared_error(y_test, predictions))
-mae = mean_absolute_error(y_test, predictions)
-mape = np.mean(np.abs((y_test - predictions) / y_test)) * 100
+# 5. Evaluate on Test Set
 
-# Forecasting
-y_full = meta['Close']
-X_full = meta.drop(columns = ['Close'])
-X_full_scaled = pd.DataFrame(
-    scaler.fit_transform(X_full),
-    index=X_full.index,
-    columns=X_full.columns
-)
+forecast_test = results.get_forecast(steps=test_days, exog=X_test_scaled)
+forecast_test_mean = forecast_test.predicted_mean
+forecast_test_ci = forecast_test.conf_int()
 
-model_full = SARIMAX(
-    endog = y_full,
-    exog = X_full_scaled,
-    order = order,
-    seasonal_order = seasonal_order,
-    enforce_stationarity = False,
-    enforce_invertibility = False
-)
+rmse = np.sqrt(mean_squared_error(y_test, forecast_test_mean))
+mae = mean_absolute_error(y_test, forecast_test_mean)
+print(f"Test RMSE: {rmse:.2f}")
+print(f"Test MAE: {mae:.2f}")
 
-results_full = model_full.fit(disp = False)
-last_date = meta.index[-1]
-future_dates = pd.bdate_range(start = last_date + pd.Timedelta(days = 1), periods = 5)
-last_features = X_full_scaled.iloc[-1].values
-future_features = pd.DataFrame(
-    np.tile(last_features, (5, 1)),
-    index=future_dates,
-    columns=X_full_scaled.columns
-)
 
-future_features['day_of_week'] = future_features.index.dayofweek
-future_features['month'] = future_features.index.month
-forecast_future = results_full.get_forecast(steps = 5, exog = future_features)
-future_predictions = forecast_future.predicted_mean
-future_conf_int = forecast_future.conf_int()
+# 6. Forecast Future Unseen Days
 
-plt.figure(figsize=(15, 8))
+# Refit model on full dataset
+full_y = meta['Close']
+full_X = meta.drop(columns=['Close'])
+full_X_scaled = pd.DataFrame(scaler.fit_transform(full_X), index=full_X.index, columns=full_X.columns)
 
-plt.plot(y_train.index, y_train, label='Training Data', color='blue', linewidth=1.5)
-plt.plot(y_test.index, y_test, label='Actual (Test)', color='green', 
-         marker='o', linewidth=2, markersize=8)
+model_full = SARIMAX(endog=full_y, exog=full_X_scaled, order=order, seasonal_order=seasonal_order)
+results_full = model_full.fit(disp=False)
 
-plt.plot(predictions.index, predictions, label='Test Predictions', 
-         color='orange', marker='x', linewidth=2, markersize=8)
-plt.fill_between(conf_int.index,
-                 conf_int.iloc[:, 0],
-                 conf_int.iloc[:, 1],
+# Generate future features
+future_days = 5
+X_future_scaled = feature_engineering_future(full_X_scaled, future_days=future_days) # Deleted scaler argument
+
+
+forecast_future = results_full.get_forecast(steps=future_days, exog=X_future_scaled)
+forecast_future_mean = forecast_future.predicted_mean
+forecast_future_ci = forecast_future.conf_int()
+
+print(f"\nNext {future_days} Business Days Forecast:")
+print(forecast_future_mean)
+
+
+# 7. Plot Test Forecast vs Actuals and Future Forecast
+plt.figure(figsize=(12,6))
+
+# Historical training data
+plt.plot(y_train.index, y_train, label='Training Close', color='blue')
+
+# Actual test data
+plt.plot(y_test.index, y_test, label='Actual Test Close', color='green', marker='o')
+
+# Forecast on test set
+plt.plot(forecast_test_mean.index, forecast_test_mean, label='Test Forecast', color='orange', marker='x')
+plt.fill_between(forecast_test_ci.index,
+                 forecast_test_ci.iloc[:,0],
+                 forecast_test_ci.iloc[:,1],
                  color='orange', alpha=0.2)
 
-plt.plot(future_predictions.index, future_predictions, label='Future Forecast', 
-         color='red', marker='^', linewidth=2.5, markersize=10)
-plt.fill_between(future_conf_int.index,
-                 future_conf_int.iloc[:, 0],
-                 future_conf_int.iloc[:, 1],
+# Forecast for future days
+plt.plot(forecast_future_mean.index, forecast_future_mean, label='Future Forecast', color='red', marker='^')
+plt.fill_between(forecast_future_ci.index,
+                 forecast_future_ci.iloc[:,0],
+                 forecast_future_ci.iloc[:,1],
                  color='red', alpha=0.2)
 
-plt.title('META Stock Price: SARIMAX Model Results', fontsize=16, fontweight='bold')
-plt.xlabel('Date', fontsize=12)
-plt.ylabel('Close Price ($)', fontsize=12)
-plt.legend(loc='best', fontsize=10)
-plt.grid(True, alpha=0.3)
-plt.tight_layout()
+plt.title('SARIMAX Forecast vs Actuals for Netflix')
+plt.xlabel('Date')
+plt.ylabel('Close Price')
+plt.legend()
 plt.show()
