@@ -22,15 +22,17 @@ plt.ylabel("Closing Price (USD)")
 plt.show()
 
 
-def feature_engineering(data):
-    data.index = pd.to_datetime(data.index)
-    data = data.ffill() #to fil out any missing values in the data frame for time series
+def feature_engineering(df):
+    df = df.copy()
+    df["Date"] = df.index
+    df["Date"] = pd.to_datetime(df["Date"])
+    #TO DO SET THE DATE AS THE INDEX
+    df = df.set_index("Date").sort_index()
+    #TO DO SET TO BUSINESS DAY FREQUENCY
+    df = df.asfreq('B')
+    df = df.ffill()
 
-    #set the frequecy to the business day frequency beceause they are only open on business days, ignoring weekends and holidays
-    data = data.asfreq('B')
-
-
-        # data["Open shifted 2d"] = data["Open"].shift(2)
+    # data["Open shifted 2d"] = data["Open"].shift(2)
     # data["Open shifted 3d"] = data["Open"].shift(3)
     # data["Open shifted 7d"] = data["Open"].shift(7)
     # data["Open shifted 14d"] = data["Open"].shift(14)
@@ -45,19 +47,39 @@ def feature_engineering(data):
     "Rate of change from previous point in time, looking at the stock price today and comparing it to the stock price yesterday &"
     "also comparing the price today to the price from 2 weeks ago" 
 
-    shift_list = [2,3,7,14,25]
-    for num_days in range(len(shift_list)):
-        data["lag_open" + str(shift_list[num_days])] = data["Open"].shift(shift_list[num_days])
+    for lag in [1, 2, 3, 7]: #TO DO
+        df[f'Open_lag_{lag}'] = df['Open'].shift(lag)
 
     'rolling is the past 20 days average'
     'can do mean or std deviation'
-    data["Rolling Mean 20d"] = data["Close"].rolling(window=20).mean()
-    data["Rolling Std 20d"] = data["Close"].rolling(window=20).std()
-    data["month"] = data.index.month
-    data["day_of_week"] = data.index.dayofweek
-    data = data.dropna()
 
-    return data
+    df['rolling_mean_7'] = df['Open'].rolling(10).mean() #5 days = 1 week
+    df['rolling_std_7'] = df['Open'].rolling(10).std()
+    
+    df['rolling_mean_7'] = df['Open'].rolling(7).mean() #5 days = 1 week
+    df['rolling_std_7'] = df['Open'].rolling(7).std() #5 days = 1 week
+    
+    df['rolling_mean_5'] = df['Open'].rolling(5).mean() #5 days = ~1 month
+    df['rolling_std_5'] = df['Open'].rolling(5).std()
+
+    df['rolling_mean_3'] = df['Open'].rolling(3).mean() #5 days = ~1 month
+    df['rolling_std_3'] = df['Open'].rolling(3).std()
+
+    df['rolling_mean_3'] = df['Open'].rolling(2).mean() #5 days = ~1 month
+    df['rolling_std_3'] = df['Open'].rolling(2).std()
+
+    # df['rolling_mean_7'] = df['Open'].rolling(7).mean() #5 days = ~1 month
+    # df['rolling_std_7'] = df['Open'].rolling(7).std()
+
+    df['returns'] = df['Open'].pct_change()
+    #df['volatility_10'] = df['returns'].rolling(10).std()
+    df['volatility_5'] = df['returns'].rolling(5).std()
+
+    df["month"] = df.index.month
+    df["day_of_week"] = df.index.dayofweek
+    df = df.dropna()
+
+    return df
 
 def feature_engineering_future(last_df, future_days=5):
     """
@@ -81,7 +103,7 @@ def feature_engineering_future(last_df, future_days=5):
 #print(data.head(10))
 
 clean_data = feature_engineering(data)
-test_days = 10
+test_days = 5
 train_data = clean_data.iloc[:-test_days]
 test_data = clean_data.iloc[-test_days:]
 
@@ -99,9 +121,9 @@ X_test_scaled = pd.DataFrame(scaler.transform(X_test), index=X_test.index, colum
 # 4. Fit SARIMAX Model (Training)
 
 order = (1, 1, 1)
-seasonal_order = (1, 1, 1, 3)
+seasonal_order = (1, 1, 1, 7)
 
-model = SARIMAX(endog=y_train, exog=X_train_scaled, order=order, seasonal_order=seasonal_order)
+model = SARIMAX(endog=y_train, exog=X_train_scaled, order=order, seasonal_order=seasonal_order, enforce_stationarity=False, enforce_invertibility=False)
 results = model.fit(disp=False)
 print(results.summary())
 
@@ -113,8 +135,10 @@ forecast_test_ci = forecast_test.conf_int()
 
 rmse = np.sqrt(mean_squared_error(y_test, forecast_test_mean))
 mae = mean_absolute_error(y_test, forecast_test_mean)
+mape = np.mean(np.abs((y_test - forecast_test_mean) / y_test)) * 100
 print(f"Test RMSE: {rmse:.2f}")
 print(f"Test MAE: {mae:.2f}")
+print(f"Test MAPE: {mape:.2f}%")
 
 # 6. Forecast Future Unseen Days
 
