@@ -4,7 +4,7 @@ import numpy as np
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import mean_squared_error, mean_absolute_error
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 
 # 1. Download Stock Data
@@ -79,7 +79,7 @@ test_data = clean_data.iloc[-test_days:]
 
 y_train = train_data['Close'] #target variable
 X_train = train_data.drop(columns=['Close']) #dropping target variable
-y_test = test_data['Close']#target variable
+y_test = test_data['Close'] #target variable
 X_test = test_data.drop(columns=['Close'])#dropping target variable
 
 # Scale features
@@ -115,9 +115,10 @@ forecast_test_ci = forecast_test.conf_int()
 
 rmse = np.sqrt(mean_squared_error(y_test, forecast_test_mean))
 mae = mean_absolute_error(y_test, forecast_test_mean)
+mape = np.mean(np.abs((y_test - forecast_test_mean) / y_test)) * 100
 print(f"Test RMSE: {rmse:.2f}")
 print(f"Test MAE: {mae:.2f}")
-
+print(f"Test MAPE: {mape:.2f}%")
 
 # 6. Forecast Future Unseen Days
 
