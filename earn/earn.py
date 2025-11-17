@@ -4,10 +4,10 @@ import numpy as np
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import mean_squared_error, mean_absolute_error
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 # Choose a stock ticker — for example, Apple
-ticker = yf.Ticker("META")
+ticker = yf.Ticker("NVDA")
 
 # Download recent data (e.g. 6 months)
 data = ticker.history(period="6mo")
@@ -47,7 +47,7 @@ def feature_engineering(df):
     "Rate of change from previous point in time, looking at the stock price today and comparing it to the stock price yesterday &"
     "also comparing the price today to the price from 2 weeks ago" 
 
-    for lag in [1, 2, 3, 7]: #TO DO
+    for lag in [1, 2, 3, 5, 7]: #TO DO
         df[f'Open_lag_{lag}'] = df['Open'].shift(lag)
 
     'rolling is the past 20 days average'
@@ -56,14 +56,14 @@ def feature_engineering(df):
     df['rolling_mean_7'] = df['Open'].rolling(10).mean() #5 days = 1 week
     df['rolling_std_7'] = df['Open'].rolling(10).std()
     
-    df['rolling_mean_7'] = df['Open'].rolling(7).mean() #5 days = 1 week
-    df['rolling_std_7'] = df['Open'].rolling(7).std() #5 days = 1 week
+    # df['rolling_mean_7'] = df['Open'].rolling(7).mean() #5 days = 1 week
+    # df['rolling_std_7'] = df['Open'].rolling(7).std() #5 days = 1 week
     
     df['rolling_mean_5'] = df['Open'].rolling(5).mean() #5 days = ~1 month
     df['rolling_std_5'] = df['Open'].rolling(5).std()
 
-    df['rolling_mean_3'] = df['Open'].rolling(3).mean() #5 days = ~1 month
-    df['rolling_std_3'] = df['Open'].rolling(3).std()
+    # df['rolling_mean_3'] = df['Open'].rolling(3).mean() #5 days = ~1 month
+    # df['rolling_std_3'] = df['Open'].rolling(3).std()
 
     df['rolling_mean_3'] = df['Open'].rolling(2).mean() #5 days = ~1 month
     df['rolling_std_3'] = df['Open'].rolling(2).std()
@@ -73,7 +73,7 @@ def feature_engineering(df):
 
     df['returns'] = df['Open'].pct_change()
     #df['volatility_10'] = df['returns'].rolling(10).std()
-    df['volatility_5'] = df['returns'].rolling(5).std()
+    df['volatility_10'] = df['returns'].rolling(10).std()
 
     df["month"] = df.index.month
     df["day_of_week"] = df.index.dayofweek
@@ -121,7 +121,7 @@ X_test_scaled = pd.DataFrame(scaler.transform(X_test), index=X_test.index, colum
 # 4. Fit SARIMAX Model (Training)
 
 order = (1, 1, 1)
-seasonal_order = (1, 1, 1, 7)
+seasonal_order = (0, 0, 0, 5)
 
 model = SARIMAX(endog=y_train, exog=X_train_scaled, order=order, seasonal_order=seasonal_order, enforce_stationarity=False, enforce_invertibility=False)
 results = model.fit(disp=False)
@@ -136,9 +136,11 @@ forecast_test_ci = forecast_test.conf_int()
 rmse = np.sqrt(mean_squared_error(y_test, forecast_test_mean))
 mae = mean_absolute_error(y_test, forecast_test_mean)
 mape = np.mean(np.abs((y_test - forecast_test_mean) / y_test)) * 100
+r2 = r2_score(y_test, forecast_test_mean)
 print(f"Test RMSE: {rmse:.2f}")
 print(f"Test MAE: {mae:.2f}")
 print(f"Test MAPE: {mape:.2f}%")
+print(f"Test R^2: {r2:.2f}")
 
 # 6. Forecast Future Unseen Days
 

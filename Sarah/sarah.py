@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import mean_squared_error, mean_absolute_error
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 # Choose a stock ticker — for example, Apple
 ticker = yf.Ticker("ADBE")
@@ -86,7 +86,7 @@ X_test_scaled = pd.DataFrame(scaler.transform(X_test), index=X_test.index, colum
 # 4. Fit SARIMAX Model (Training)
 # ---------------------------------------
 order = (1, 1, 1)
-seasonal_order = (1, 1, 1, 5)
+seasonal_order = (0, 0, 1, 5)
 
 model = SARIMAX(endog=y_train, exog=X_train_scaled, order=order, seasonal_order=seasonal_order)
 results = model.fit(disp=False)
@@ -95,15 +95,18 @@ print(results.summary())
 # ---------------------------------------
 # 5. Evaluate on Test Set
 # ---------------------------------------
-
 forecast_test = results.get_forecast(steps=test_days, exog=X_test_scaled)
 forecast_test_mean = forecast_test.predicted_mean
 forecast_test_ci = forecast_test.conf_int()
 
 rmse = np.sqrt(mean_squared_error(y_test, forecast_test_mean))
 mae = mean_absolute_error(y_test, forecast_test_mean)
+mape = np.mean(np.abs((y_test - forecast_test_mean) / y_test)) * 100
+r2 = r2_score(y_test, forecast_test_mean)
+print(f"Test R²: {r2:.3f}")
 print(f"Test RMSE: {rmse:.2f}")
 print(f"Test MAE: {mae:.2f}")
+print(f"Test MAPE: {mape:.2f}%")
 
 # ---------------------------------------
 # 6. Forecast Future Unseen Days
@@ -128,8 +131,10 @@ forecast_future_ci = forecast_future.conf_int()
 print(f"\nNext {future_days} Business Days Forecast:")
 print(forecast_future_mean)
 
-
+# ---------------------------------------
 # 7. Plot Test Forecast vs Actuals and Future Forecast
+# ---------------------------------------
+
 plt.figure(figsize=(12,6))
 
 # Historical training data

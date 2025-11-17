@@ -4,7 +4,7 @@ import numpy as np
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import mean_squared_error, mean_absolute_error
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 
 # 1. Download Stock Data
@@ -93,7 +93,7 @@ X_test_scaled = pd.DataFrame(scaler.transform(X_test), index=X_test.index, colum
 # 4. Fit SARIMAX Model (Training)
 #TO DO
 order = (1, 1, 1)
-seasonal_order = (1, 1, 1, 5)
+seasonal_order = (0, 0, 0, 5)
 
 model = SARIMAX(
     endog=y_train, 
@@ -121,6 +121,8 @@ forecast_test_ci = forecast_test.conf_int()
 rmse = np.sqrt(mean_squared_error(y_test, forecast_test_mean))
 mae = mean_absolute_error(y_test, forecast_test_mean)
 mape = np.mean(np.abs((y_test - forecast_test_mean) / y_test)) * 100
+r2 = r2_score(y_test, forecast_test_mean)
+print(f"Test R²: {r2:.3f}")
 print(f"Test RMSE: {rmse:.2f}")
 print(f"Test MAE: {mae:.2f}")
 print(f"Test MAPE: {mape:.2f}%")
