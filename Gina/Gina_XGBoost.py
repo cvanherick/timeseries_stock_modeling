@@ -24,15 +24,13 @@ def feature_engineering_train(df):
         df[f'Close_lag_{lag}'] = df['Close'].shift(lag)
         
     # TODO: Try different rolling features
-    df['rolling_mean_5'] = df['High'].rolling(5).mean() #5 days = 1 week
-    df['rolling_std_5'] = df['High'].rolling(5).std() #5 days = 1 week
+    df['rolling_mean_5'] = df['Close'].rolling(5).mean() #5 days = 1 week
+    df['rolling_std_5'] = df['Close'].rolling(5).std() #5 days = 1 week
 
-    df['rolling_mean_10'] = df['High'].rolling(10).mean() #5 days = 1 week
-    df['rolling_std_10'] = df['High'].rolling(10).std() #5 days = 1 week
+    df['rolling_mean_10'] = df['Close'].rolling(10).mean() #5 days = 1 week
+    df['rolling_std_10'] = df['Close'].rolling(10).std() #5 days = 1 week
 
-
-
-
+    
     
     # TODO: add any other feature you think might help your model (feel free to do research online)
     # Calendar features
@@ -71,7 +69,7 @@ X_test_scaled = pd.DataFrame(scaler.transform(X_test), index=X_test.index, colum
 # TODO: feel free to add more model parameters as you think nescesarry to boost accuracy
 # TODO: I used 11 parameter total for my model
 model = XGBRegressor(
-    n_estimators=200,         # number of trees
+    n_estimators=300,         # number of trees
     max_depth=15,              # complexity of the tree
     learning_rate=0.1,        # how fast the model learns
     subsample=0.9,              # randomness to prevent overfitting
