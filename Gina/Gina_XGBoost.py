@@ -20,19 +20,24 @@ def feature_engineering_train(df):
     
     # TODO: Choose lag periods based on what you see in your data
     # for XGBoost you can use the target variable as a lag feature because it is not already being captured by the model
-    for lag in [1, 3, 5, 10]: #TO DO
+    for lag in [1, 2, 3, 5, 7, 10, 15, 20]: #TO DO
         df[f'Close_lag_{lag}'] = df['Close'].shift(lag)
         
     # TODO: Try different rolling features
-    df['rolling_mean_5'] = df['High'].rolling(5).mean() #5 days = 1 week
-    df['rolling_std_5'] = df['High'].rolling(5).std() #5 days = 1 week
+    df['rolling_mean_5'] = df['Close'].rolling(5).mean() #5 days = 1 week
+    df['rolling_std_5'] = df['Close'].rolling(5).std() #5 days = 1 week
 
+    df['rolling_mean_10'] = df['Close'].rolling(10).mean() #5 days = 1 week
+    df['rolling_std_10'] = df['Close'].rolling(10).std() #5 days = 1 week
+
+    
     
     # TODO: add any other feature you think might help your model (feel free to do research online)
     # Calendar features
     # TODO: Feel free to experiment and add more
     df['day_of_week'] = df.index.dayofweek
     df['month'] = df.index.month
+    df['quarter'] = df.index.quarter
     
     df.dropna(inplace=True)  # Drop missing values after transformations
     return df
@@ -64,9 +69,14 @@ X_test_scaled = pd.DataFrame(scaler.transform(X_test), index=X_test.index, colum
 # TODO: feel free to add more model parameters as you think nescesarry to boost accuracy
 # TODO: I used 11 parameter total for my model
 model = XGBRegressor(
-    n_estimators=0,         # TODO: Try different values
-    max_depth=0,              # TODO: Try tuning
-    learning_rate=0,        # TODO: Try tuning
+    n_estimators=300,         # number of trees
+    max_depth=15,              # complexity of the tree
+    learning_rate=0.1,        # how fast the model learns
+    subsample=0.9,              # randomness to prevent overfitting
+    colsample_bytree=0.85,       # choose subset of features per tree
+    gamma=0.2,                  # discourage overly complex trees
+    reg_alpha=0.1,              # L1 regularization (reduces noise)
+    reg_lambda=0.5,        # L2 regularization (prevents overfit)
     random_state=42
 )
 model.fit(X_train_scaled, y_train)
