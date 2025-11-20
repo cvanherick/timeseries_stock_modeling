@@ -4,7 +4,7 @@ import numpy as np
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import mean_squared_error, mean_absolute_error
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 
 # 1. Download Stock Data
@@ -79,7 +79,7 @@ test_data = clean_data.iloc[-test_days:]
 
 y_train = train_data['Close'] #target variable
 X_train = train_data.drop(columns=['Close']) #dropping target variable
-y_test = test_data['Close']#target variable
+y_test = test_data['Close'] #target variable
 X_test = test_data.drop(columns=['Close'])#dropping target variable
 
 # Scale features
