@@ -4,12 +4,19 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import mean_squared_error, mean_absolute_error
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from xgboost import XGBRegressor
+import holidays
 
 # 1. Download Stock Data
 ticker = yf.Ticker("NVDA") #we are all using NVIDIA stock
-data = ticker.history(period="YOUR_PERIOD_HERE") # TODO: Choose a period, e.g., "1y", "6mo"
+data = ticker.history(period="6mo") # TODO: Choose a period, e.g., "1y", "6mo"
+
+plt.plot(data.index, data["Close"])
+plt.title("NVIDIA Close Price (Last 6 Months)")
+plt.xlabel("Date")
+plt.ylabel("Closing Price (USD)")
+plt.show()
 
 # 2. Feature Engineering Functions
 def feature_engineering_train(df):
@@ -18,13 +25,41 @@ def feature_engineering_train(df):
     df.set_index('Date', inplace=True)
     df = df.asfreq('B')
     
-    # TODO: Choose lag periods based on what you see in your data
+    #TODO: Choose lag periods based on what you see in your data
     # for XGBoost you can use the target variable as a lag feature because it is not already being captured by the model
+    for lag in [1, 2, 3, 5, 7]:
+        df[f'Open_lag_{lag}'] = df['Open'].shift(lag)
+        df[f'Close_lag_{lag}'] = df['Close'].shift(lag)
     
     # TODO: Try different rolling features
-    
+    df['rolling_mean_10'] = df['Open'].rolling(10).mean() #5 days = 1 week
+    df['rolling_std_10'] = df['Open'].rolling(10).std()
+
+    df['rolling_mean_5'] = df['Open'].rolling(5).mean() #5 days = ~1 month
+    df['rolling_std_5'] = df['Open'].rolling(5).std()
+
+    df['rolling_mean_3'] = df['Open'].rolling(3).mean() #5 days = ~1 month
+    df['rolling_std_3'] = df['Open'].rolling(3).std()
     # TODO: add any other feature you think might help your model (feel free to do research online)
     # Calendar features
+
+    dates = df.index.normalize()   # strip time-of-day if any
+
+    df["is_quarter_end"]  = dates.is_quarter_end.astype(int)
+    df["is_quarter_start"]  = dates.is_quarter_start.astype(int)
+
+    us_holidays = holidays.US()
+
+    # df["is_holiday"] = dates.isin(us_holidays).astype(int)
+
+    # is_hol = df["is_holiday"].astype(bool)
+    # df["is_pre_holiday"]  = ((~is_hol) & is_hol.shift(-1, fill_value=False)).astype(int)
+    df['returns'] = df['Open'].pct_change()
+    df['ret_1'] = df['Close'].pct_change(1)
+    df['ret_5'] = df['Close'].pct_change(5)
+    df['ret_3'] = df['Close'].pct_change(3)
+    df['volatility_10'] = df['returns'].rolling(10).std()
+
     # TODO: Feel free to experiment and add more
     df['day_of_week'] = df.index.dayofweek
     df['month'] = df.index.month
@@ -59,10 +94,30 @@ X_test_scaled = pd.DataFrame(scaler.transform(X_test), index=X_test.index, colum
 # TODO: feel free to add more model parameters as you think nescesarry to boost accuracy
 # TODO: I used 11 parameter total for my model
 model = XGBRegressor(
-    n_estimators=0,         # TODO: Try different values
-    max_depth=0,              # TODO: Try tuning
-    learning_rate=0,        # TODO: Try tuning
-    random_state=42
+    n_estimators= 700,         # TODO: Try different values
+    max_depth= 8,              # TODO: Try tuning
+    learning_rate= 0.3,        # TODO: Try tuning
+    random_state= 42,
+    reg_lambda = 0.7,
+    gamma = 0.5,
+    scale_pos_weight = 1,
+    eval_metric = 'rmse'
+
+    # n_estimators= 2000,         # TODO: Try different values
+    # max_depth= 3,              # TODO: Try tuning
+    # learning_rate= 0.01,        # TODO: Try tuning
+    # random_state= 42,
+    # reg_lambda = 1,
+    # gamma = 0.5,
+    # colsample_bytree = 0.8,
+    # scale_pos_weight = 1,
+    # eval_metric = 'rmse'
+
+
+    # min_child_weight = 4,      # prevent tiny, noisy leaves
+    # subsample = 0.9,    # row subsampling
+
+
 )
 model.fit(X_train_scaled, y_train)
 
@@ -74,6 +129,7 @@ mape = np.mean(np.abs((y_test - forecast_test) / y_test)) * 100
 print(f"Test RMSE: {rmse:.2f}")
 print(f"Test MAE: {mae:.2f}")
 print(f"Test MAPE: {mape:.2f}")
+
 
 # 6. Forecast Future Days
 full_X = clean_data.drop(columns=['Close'])
@@ -95,3 +151,10 @@ plt.xlabel('Date')
 plt.ylabel('Close Price')
 plt.legend()
 plt.show()
+
+
+corr_df = clean_data.copy()
+
+
+corr_matrix = corr_df.corr(numeric_only=True)
+corr_matrix[["Close"]].sort_values(by = "Close", ascending=False)
