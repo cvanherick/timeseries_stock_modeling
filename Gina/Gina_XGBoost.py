@@ -71,9 +71,9 @@ X_test_scaled = pd.DataFrame(scaler.transform(X_test), index=X_test.index, colum
 # TODO: feel free to add more model parameters as you think nescesarry to boost accuracy
 # TODO: I used 11 parameter total for my model
 model = XGBRegressor(
-    n_estimators=200,         # TODO: Try different values
-    max_depth=15,              # TODO: Try tuning
-    learning_rate=0.1,        # TODO: Try tuning
+    n_estimators=200,         # number of trees
+    max_depth=15,              # complexity of the tree
+    learning_rate=0.1,        # how fast the model learns
     subsample=0.9,              # randomness to prevent overfitting
     colsample_bytree=0.85,       # choose subset of features per tree
     gamma=0.2,                  # discourage overly complex trees
