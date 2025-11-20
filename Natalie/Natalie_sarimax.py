@@ -115,9 +115,10 @@ forecast_test_ci = forecast_test.conf_int()
 
 rmse = np.sqrt(mean_squared_error(y_test, forecast_test_mean))
 mae = mean_absolute_error(y_test, forecast_test_mean)
+mape = np.mean(np.abs((y_test - forecast_test_mean) / y_test)) * 100
 print(f"Test RMSE: {rmse:.2f}")
 print(f"Test MAE: {mae:.2f}")
-
+print(f"Test MAPE: {mape:.2f}%")
 
 # 6. Forecast Future Unseen Days
 
