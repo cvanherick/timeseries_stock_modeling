@@ -4,52 +4,49 @@ import pandas as pd
 import numpy as np
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import mean_squared_error, mean_absolute_error
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 # Choose a stock ticker — for example, Apple
 ticker = yf.Ticker("AMD")
 
 # Download recent data (e.g. 6 months)
-data = ticker.history(period="6mo")
-
-# Show the first few rows
-
-plt.plot(data.index, data['Close'])
-plt.ylabel("Price in US Dollars")
-plt.xlabel("Date")
-plt.title('AMD Stock Price Over the Last 6 Months')
-#plt.show()
-
-#print('Starts here:')
-#print(data.index[-2])
-#print(data.iloc[-2])
+raw_data = ticker.history(period="6mo")
 
 
-#data['lf_prev1_open'] = data['Open'].shift(1)
-#data['lf_prev3_open'] = data['Open'].shift(3)
-#data['lf_prev7_open'] = data['Open'].shift(7)
-#data['lf_prev14_open'] = data['Open'].shift(14)
-#data['lf_prev30_open'] = data['Open'].shift(30)
-
-#takes in dataframe and list of numbers for shifting the data
-def engineered(data, shift_list):
+# 2. Feature Engineering Pipelines
+def feature_engineering_train(df):
+    """Feature engineering for training data."""
+    df = df.copy()
+    df["Date"] = df.index
+    df["Date"] = pd.to_datetime(df["Date"]) #TO DO SET THE DATE COLUMN TO A DATETIME OBJECT
+    df = df.set_index("Date").sort_index()  #TO DO SET THE DATE AS THE INDEX
+    df = df.asfreq('B') #TO DO SET TO BUSINESS DAY FREQUENCY
+    df = df.ffill()
     
-    data = data.ffill()
-    data = data.asfreq("B")
+    #CHOOSE THIS BASED ON TRENDS YOU SEE IN YOUR INDIVIDUAL STOCK
+    #this is the lag periods
+    for lag in [1, 5, 10, 20]: #TO DO
+        df[f'Open_lag_{lag}'] = df['Open'].shift(lag) #TO DO
+
+    #TO DO below this it what i did for mine you can try differnt things for your data depending on what trends you see in your data
+    #df['rolling_mean_5'] = df['Open'].rolling(5).mean() #5 days = 1 week
+    #df['rolling_std_5'] = df['Open'].rolling(5).std() #5 days = 1 week
+    #df['rolling_mean_20'] = df['Open'].rolling(20).mean() #5 days = ~1 month
+    df['rolling_mean_5'] = df['Open'].rolling(5).mean()
+    df['rolling_std_5'] = df['Open'].rolling(5).std()
     
-    for i in range(len(shift_list)):
-        col_name = "lag_open" + str(shift_list[i])
-        data[col_name] = data['Open'].shift(shift_list[i])
-    data['day_of_week'] = data.index.dayofweek
-    data['month'] = data.index.month
+    #df['returns'] = df['Open'].pct_change()
+    #df['volatility_10'] = df['returns'].rolling(10).std()
+    df['returns'] = df['Open'].pct_change()
+    df['volatility_10'] = df['returns'].rolling(10).std()
+    
+    df['day_of_week'] = df.index.dayofweek #TO DO
+    df['month'] = df.index.month #TO DO
+    
+    df = df.dropna() #TO DO drop nan values
+    
+    return df
 
-    data["Rolling Mean 5d"] = data["Open"].rolling(window=5).mean()
-    data["Rolling StD 5d"] = data["Open"].rolling(window=5).std()
-    data["Rolling Mean 20d"] = data["Open"].rolling(window=20).mean()
-
-    data = data.dropna()
-
-    return data
 
 def feature_engineering_future(last_df, future_days=5):
     """
@@ -70,23 +67,12 @@ def feature_engineering_future(last_df, future_days=5):
 
     return future_exog
 
-#engineered_df = engineered(data, [1, 3, 7, 14, 30])
-#print('engineered below!')
-#print(engineered_df)
 
 
-
-#.rolling(arg - period).(mean or std) and takes the average over the period
-#shift 
-#make above lag stuff into a function
-
-#print(data['lf_prev1_open'])
-
-# -------------------------------------------------- COPIED/MODELING ----------------------------------------------------
 
 # 3. Prepare Train/Test Data
 
-clean_data = engineered(data, [1, 3, 7, 14, 30])
+clean_data = feature_engineering_train(raw_data)
 test_days = 5
 train_data = clean_data.iloc[:-test_days]
 test_data = clean_data.iloc[-test_days:]
@@ -103,11 +89,20 @@ X_test_scaled = pd.DataFrame(scaler.transform(X_test), index=X_test.index, colum
 
 
 # 4. Fit SARIMAX Model (Training)
-#TO DO
-#order = ()
-#seasonal_order = ()
+order = (1, 1, 1)
+seasonal_order = (0, 1, 1, 5)
 
-model = SARIMAX(endog=y_train, exog=X_train_scaled, order=(1, 1, 1), seasonal_order=(1, 1, 1, 5))
+model = SARIMAX(
+    endog=y_train,
+    exog=X_train_scaled,
+    order=order,
+    seasonal_order=seasonal_order,
+    enforce_stationarity=False,
+    enforce_invertibility=False
+)
+results = model.fit()
+
+model = SARIMAX(endog=y_train, exog=X_train_scaled, order=order, seasonal_order=seasonal_order)
 results = model.fit(disp=False)
 print(results.summary())
 
@@ -120,9 +115,13 @@ forecast_test_ci = forecast_test.conf_int()
 
 rmse = np.sqrt(mean_squared_error(y_test, forecast_test_mean))
 mae = mean_absolute_error(y_test, forecast_test_mean)
+mape = np.mean(np.abs((y_test - forecast_test_mean) / y_test)) * 100
+r2 = r2_score(y_test, forecast_test_mean)
+
 print(f"Test RMSE: {rmse:.2f}")
 print(f"Test MAE: {mae:.2f}")
-
+print(f"Test MAPE: {mape:.2f}%")
+print(f"Test R2: {r2:.2f}")
 
 # 6. Forecast Future Unseen Days
 
@@ -131,12 +130,13 @@ full_y = clean_data['Close']
 full_X = clean_data.drop(columns=['Close'])
 full_X_scaled = pd.DataFrame(scaler.fit_transform(full_X), index=full_X.index, columns=full_X.columns)
 
-model_full = SARIMAX(endog=full_y, exog=full_X_scaled, order=(1, 1, 1), seasonal_order=(1, 1, 1, 4))
+model_full = SARIMAX(endog=full_y, exog=full_X_scaled, order=order, seasonal_order=seasonal_order)
 results_full = model_full.fit(disp=False)
 
 # Generate future features
 future_days = 5
-X_future_scaled = feature_engineering_future(full_X_scaled, future_days=future_days)
+X_future_scaled = feature_engineering_future(full_X_scaled, future_days=future_days) # Deleted scaler argument
+
 
 forecast_future = results_full.get_forecast(steps=future_days, exog=X_future_scaled)
 forecast_future_mean = forecast_future.predicted_mean
@@ -174,6 +174,3 @@ plt.xlabel('Date')
 plt.ylabel('Close Price')
 plt.legend()
 plt.show()
-
-
-
